@@ -1836,7 +1836,7 @@ void RosFilter<T>::loadParams()
     }
   }
 
-  auto load_covariance = [this](const std::string & parameter, Eigen::MatrixXd & covariance)
+  auto load_covariance = [this](const std::string & parameter, Eigen::MatrixXd & covariance) -> bool
     {
       covariance.setZero();
       std::vector<double> covar_flat;
@@ -1848,8 +1848,10 @@ void RosFilter<T>::loadParams()
             get_logger(), "Detected a " << parameter << " parameter with "
               "length " << STATE_SIZE << ". Assuming diagonal values specified.");
           covariance.diagonal() = Eigen::VectorXd::Map(covar_flat.data(), STATE_SIZE);
+          return true;
         } else if (covariance.size() == STATE_SIZE * STATE_SIZE) {
           covariance = Eigen::MatrixXd::Map(covar_flat.data(), STATE_SIZE, STATE_SIZE);
+          return true;
         } else {
           std::string error = "Invalid " + parameter + " specified. Expected a length of " +
             std::to_string(STATE_SIZE) + " or " + std::to_string(STATE_SIZE * STATE_SIZE) +
@@ -1858,15 +1860,20 @@ void RosFilter<T>::loadParams()
           throw std::invalid_argument(error);
         }
       }
+      return false;
     };
 
-  load_covariance("process_noise_covariance", process_noise_covariance_);
-  RF_DEBUG("Process noise covariance is:\n" << process_noise_covariance_ << "\n");
-  filter_.setProcessNoiseCovariance(process_noise_covariance_);
+  process_noise_covariance_.setZero();
+  if( load_covariance("process_noise_covariance", process_noise_covariance_) ) {
+    RF_DEBUG("Process noise covariance is:\n" << process_noise_covariance_ << "\n");
+    filter_.setProcessNoiseCovariance(process_noise_covariance_);
+  }
 
-  load_covariance("initial_estimate_covariance", initial_estimate_error_covariance_);
-  RF_DEBUG("Initial estimate covariance is:\n" << initial_estimate_error_covariance_ << "\n");
-  filter_.setEstimateErrorCovariance(initial_estimate_error_covariance_);
+  initial_estimate_error_covariance_.setZero();
+  if( load_covariance("initial_estimate_covariance", initial_estimate_error_covariance_) ) {
+    RF_DEBUG("Initial estimate covariance is:\n" << initial_estimate_error_covariance_ << "\n");
+    filter_.setEstimateErrorCovariance(initial_estimate_error_covariance_);
+  }
 }
 
 template<typename T>
