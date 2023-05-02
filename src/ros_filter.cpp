@@ -2104,18 +2104,20 @@ void RosFilter<T>::initialize()
   }
 
   // Set up the frequency diagnostic
-  min_frequency_ = frequency_ - 2;
-  max_frequency_ = frequency_ + 2;
-  freq_diag_ =
-    std::make_unique<diagnostic_updater::HeaderlessTopicDiagnostic>(
-    "odometry/filtered",
-    *diagnostic_updater_,
-    diagnostic_updater::FrequencyStatusParam(
-      &min_frequency_,
-      &max_frequency_, 0.1, 10));
+  if (print_diagnostics_) {
+    min_frequency_ = frequency_ - 2;
+    max_frequency_ = frequency_ + 2;
+    freq_diag_ =
+      std::make_unique<diagnostic_updater::HeaderlessTopicDiagnostic>(
+      "odometry/filtered",
+      *diagnostic_updater_,
+      diagnostic_updater::FrequencyStatusParam(
+        &min_frequency_,
+        &max_frequency_, 0.1, 10));
 
-  last_diag_time_ = this->now();
-  last_diff_time_ = this->now().seconds();
+    last_diag_time_ = this->now();
+    last_diff_time_ = this->now().seconds();
+  }
 
   // Clear out the transforms
   world_base_link_trans_msg_.transform =
