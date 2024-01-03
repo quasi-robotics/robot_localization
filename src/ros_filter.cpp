@@ -2729,7 +2729,7 @@ bool RosFilter<T>::prepareAcceleration(
         if (std::abs(curAttitude.length() - 1.0) > 0.01) {
           RCLCPP_WARN_ONCE(
             get_logger(),
-            "An input was not normalized, this should NOT happen, but will normalize.");
+            "An IMU input was not normalized, this should NOT happen, but will normalize.");
           curAttitude.normalize();
         }
         trans.setRotation(curAttitude);
@@ -2907,7 +2907,7 @@ bool RosFilter<T>::preparePose(
     if (std::abs(orientation.length() - 1.0) > 0.01) {
       RCLCPP_WARN_ONCE(
         get_logger(),
-        "An input was not normalized, this should NOT happen, but will normalize.");
+        "An orientation input was not normalized, this should NOT happen, but will normalize.");
       orientation.normalize();
     }
   }
