@@ -58,7 +58,7 @@
 #include "robot_localization/srv/set_pose.hpp"
 #include "sensor_msgs/msg/imu.hpp"
 #include "std_srvs/srv/empty.hpp"
-#include "tf2/LinearMath/Transform.h"
+#include "tf2/LinearMath/Transform.hpp"
 #include "tf2_ros/buffer.h"
 #include "tf2_ros/transform_broadcaster.h"
 #include "tf2_ros/transform_listener.h"
@@ -538,6 +538,10 @@ protected:
   //!
   bool use_control_;
 
+  //! @brief Whether or not we use a stamped control term
+  //!
+  bool stamped_control_;
+
   //! @brief Start the Filter disabled at startup
   //!
   //! If this is true, the filter reads parameters and prepares publishers and subscribes
@@ -778,6 +782,10 @@ protected:
   //! @brief Subscribes to the control input topic
   //!
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr control_sub_;
+
+  //! @brief Subscribes to the control stamped input topic
+  //!
+  rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr stamped_control_sub_;
 
   //! @brief Subscribes to the set_pose topic (usually published from rviz).
   //! Message type is geometry_msgs/PoseWithCovarianceStamped.

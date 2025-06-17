@@ -2,6 +2,30 @@
 Changelog for package robot_localization
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+3.9.3 (2025-05-19)
+------------------
+* Fixing deprecated tf2 headers (`#926 <https://github.com/cra-ros-pkg/robot_localization/issues/926>`_)
+* Contributors: Tom Moore
+
+3.9.2 (2025-03-21)
+------------------
+* Same change on rolling (`#918 <https://github.com/cra-ros-pkg/robot_localization/issues/918>`_)
+  Co-authored-by: Ferry Schoenmakers <ferry.schoenmakers@nobleo.nl>
+* Fixing bug with diagonal covariance loading (`#909 <https://github.com/cra-ros-pkg/robot_localization/issues/909>`_)
+* Switching stamped control to default true for rolling/future distributions to align with Nav2 and ROS 2 Control (`#910 <https://github.com/cra-ros-pkg/robot_localization/issues/910>`_)
+* Added subscription to stamped topic (`#898 <https://github.com/cra-ros-pkg/robot_localization/issues/898>`_)
+  * Added subscription to stamped topic
+* Fixing IMU differential test (`#897 <https://github.com/cra-ros-pkg/robot_localization/issues/897>`_)
+* Contributors: Ferry Schoenmakers, Pablo, Steve Macenski, Tom Moore
+
+3.9.1 (2024-08-29)
+------------------
+* Switch robot_localization to modern CMake idioms. (`#895 <https://github.com/cra-ros-pkg/robot_localization/issues/895>`_)
+* Fix warnings when building against Rolling. (`#896 <https://github.com/cra-ros-pkg/robot_localization/issues/896>`_)
+* Resolve mixing of UTM and local transforms in local cartesian mode (`#886 <https://github.com/cra-ros-pkg/robot_localization/issues/886>`_)
+* Spam the logs a little bit less (`#880 <https://github.com/cra-ros-pkg/robot_localization/issues/880>`_)
+* Contributors: Chris Lalancette, JayHerpin, Tim Clephas
+
 3.9.0 (2024-04-24)
 ------------------
 

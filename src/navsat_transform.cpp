@@ -43,17 +43,17 @@
 #include "rclcpp/qos.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "robot_localization/filter_common.hpp"
-#include "robot_localization/navsat_conversions.hpp"
+#include "navsat_conversions.hpp"
 #include "robot_localization/ros_filter_utilities.hpp"
 #include "robot_localization/srv/from_ll.hpp"
 #include "robot_localization/srv/set_datum.hpp"
 #include "robot_localization/srv/to_ll.hpp"
 #include "sensor_msgs/msg/imu.hpp"
 #include "sensor_msgs/msg/nav_sat_fix.hpp"
-#include "tf2/LinearMath/Matrix3x3.h"
-#include "tf2/LinearMath/Quaternion.h"
-#include "tf2/LinearMath/Transform.h"
-#include "tf2/LinearMath/Vector3.h"
+#include "tf2/LinearMath/Matrix3x3.hpp"
+#include "tf2/LinearMath/Quaternion.hpp"
+#include "tf2/LinearMath/Transform.hpp"
+#include "tf2/LinearMath/Vector3.hpp"
 #include "tf2_ros/buffer.h"
 #include "tf2_ros/transform_listener.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
@@ -553,15 +553,19 @@ void NavSatTransform::mapToLL(
 
     altitude = odom_as_cartesian.getOrigin().getZ();
   } else {
-    GeographicLib::UTMUPS::Reverse(
-      utm_zone_,
-      northp_,
-      odom_as_cartesian.getOrigin().getX(),
-      odom_as_cartesian.getOrigin().getY(),
-      latitude,
-      longitude);
-
-    altitude = odom_as_cartesian.getOrigin().getZ();
+    try {
+      GeographicLib::UTMUPS::Reverse(
+        utm_zone_,
+        northp_,
+        odom_as_cartesian.getOrigin().getX(),
+        odom_as_cartesian.getOrigin().getY(),
+        latitude,
+        longitude);
+      altitude = odom_as_cartesian.getOrigin().getZ();
+    } catch (const GeographicLib::GeographicErr & e) {
+      RCLCPP_ERROR_STREAM(this->get_logger(), e.what());
+      latitude = longitude = altitude = std::numeric_limits<double>::quiet_NaN();
+    }
   }
 }
 
@@ -695,7 +699,7 @@ void NavSatTransform::gpsFixCallback(
       try {
         GeographicLib::UTMUPS::Forward(
           msg->latitude, msg->longitude, zone_tmp, northp_tmp,
-          cartesian_x, cartesian_y);
+          cartesian_x, cartesian_y, utm_zone_);
       } catch (GeographicLib::GeographicErr const & e) {
         RCLCPP_ERROR_STREAM(this->get_logger(), e.what());
         return;
