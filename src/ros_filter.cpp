@@ -73,9 +73,9 @@
 #include "tf2/LinearMath/Transform.hpp"
 #include "tf2/LinearMath/Vector3.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
-#include "tf2_ros/buffer.h"
-#include "tf2_ros/transform_broadcaster.h"
-#include "tf2_ros/transform_listener.h"
+#include <tf2_ros/buffer.hpp>
+#include <tf2_ros/transform_broadcaster.hpp>
+#include <tf2_ros/transform_listener.hpp>
 
 namespace robot_localization
 {
@@ -164,12 +164,20 @@ void RosFilter<T>::reset()
   filter_state_history_.clear();
   measurement_history_.clear();
 
+  angular_acceleration_.setZero();
+  angular_acceleration_cov_.setIdentity();
+  angular_acceleration_cov_ *= 0.01;
+
+  last_state_twist_rot_.setZero();
+
   // Also set the last set pose time, so we ignore all messages
   // that occur before it
   last_set_pose_time_ = rclcpp::Time(0, 0, RCL_ROS_TIME);
   last_diag_time_ = rclcpp::Time(0, 0, RCL_ROS_TIME);
   latest_control_time_ = rclcpp::Time(0, 0, RCL_ROS_TIME);
   last_published_stamp_ = rclcpp::Time(0, 0, RCL_ROS_TIME);
+
+  last_diff_time_ = this->now().seconds();
 
   // clear tf buffer to avoid TF_OLD_DATA errors
   tf_buffer_->clear();
@@ -382,6 +390,7 @@ void RosFilter<T>::forceTwoD(
   Eigen::MatrixXd & measurement_covariance,
   std::vector<bool> & update_vector)
 {
+  // Force 3D variables to 0 in the measurement
   measurement(StateMemberZ) = 0.0;
   measurement(StateMemberRoll) = 0.0;
   measurement(StateMemberPitch) = 0.0;
@@ -390,6 +399,24 @@ void RosFilter<T>::forceTwoD(
   measurement(StateMemberVpitch) = 0.0;
   measurement(StateMemberAz) = 0.0;
 
+  // Need to eliminate any off-diagonal covariance values that involve one of our 3D variables
+  measurement_covariance.col(StateMemberZ).fill(0.0);
+  measurement_covariance.col(StateMemberRoll).fill(0.0);
+  measurement_covariance.col(StateMemberPitch).fill(0.0);
+  measurement_covariance.col(StateMemberVz).fill(0.0);
+  measurement_covariance.col(StateMemberVroll).fill(0.0);
+  measurement_covariance.col(StateMemberVpitch).fill(0.0);
+  measurement_covariance.col(StateMemberAz).fill(0.0);
+
+  measurement_covariance.row(StateMemberZ).fill(0.0);
+  measurement_covariance.row(StateMemberRoll).fill(0.0);
+  measurement_covariance.row(StateMemberPitch).fill(0.0);
+  measurement_covariance.row(StateMemberVz).fill(0.0);
+  measurement_covariance.row(StateMemberVroll).fill(0.0);
+  measurement_covariance.row(StateMemberVpitch).fill(0.0);
+  measurement_covariance.row(StateMemberAz).fill(0.0);
+
+  // Now set the diagonal covariance values to something small
   measurement_covariance(StateMemberZ, StateMemberZ) = 1e-6;
   measurement_covariance(StateMemberRoll, StateMemberRoll) = 1e-6;
   measurement_covariance(StateMemberPitch, StateMemberPitch) = 1e-6;
@@ -398,6 +425,7 @@ void RosFilter<T>::forceTwoD(
   measurement_covariance(StateMemberVpitch, StateMemberVpitch) = 1e-6;
   measurement_covariance(StateMemberAz, StateMemberAz) = 1e-6;
 
+  // Finally, update the update vector
   update_vector[StateMemberZ] = 1;
   update_vector[StateMemberRoll] = 1;
   update_vector[StateMemberPitch] = 1;
@@ -710,6 +738,10 @@ void RosFilter<T>::integrateMeasurements(const rclcpp::Time & current_time)
           measurement->latest_control_time_);
         restored_measurement_count--;
       }
+
+      auto previous_state = filter_.getState();
+      auto previous_covar = filter_.getEstimateErrorCovariance();
+      auto last_measurement_time = filter_.getLastMeasurementTime();
 
       // This will call predict and, if necessary, correct
       filter_.processMeasurement(*(measurement.get()));
@@ -1141,7 +1173,7 @@ void RosFilter<T>::loadParams()
   // Create a service for manually enabling the filter
   enable_filter_srv_ =
     this->create_service<std_srvs::srv::Empty>(
-    "enable", std::bind(
+    "~/enable", std::bind(
       &RosFilter::enableFilterSrvCallback, this,
       std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
@@ -1156,7 +1188,7 @@ void RosFilter<T>::loadParams()
   // publishing
   toggle_filter_processing_srv_ =
     this->create_service<robot_localization::srv::ToggleFilterProcessing>(
-    "toggle", std::bind(
+    "~/toggle", std::bind(
       &RosFilter<T>::toggleFilterProcessingCallback, this,
       std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
@@ -1757,9 +1789,6 @@ void RosFilter<T>::loadParams()
     }
   } while (more_params);
 
-  angular_acceleration_cov_.resize(ORIENTATION_SIZE, ORIENTATION_SIZE);
-  angular_acceleration_cov_.setZero();
-
   // Now that we've checked if IMU linear acceleration is being used, we can
   // determine our final control parameters
   if (use_control_ && std::accumulate(
@@ -2050,6 +2079,17 @@ void RosFilter<T>::poseCallback(
 template<typename T>
 void RosFilter<T>::initialize()
 {
+  if (!this->get_clock()->started()) {
+    RCLCPP_INFO(get_logger(), "Waiting for clock to start...");
+    this->get_clock()->wait_until_started();
+  }
+
+  angular_acceleration_.setZero();
+  angular_acceleration_cov_.setIdentity();
+  angular_acceleration_cov_ *= 1e-6;
+
+  last_state_twist_rot_.setZero();
+
   diagnostic_updater_ = std::make_unique<diagnostic_updater::Updater>(
     shared_from_this());
   diagnostic_updater_->setHardwareID("none");
@@ -2078,6 +2118,7 @@ void RosFilter<T>::initialize()
         &max_frequency_, 0.1, 10));
 
     last_diag_time_ = this->now();
+    last_diff_time_ = this->now().seconds();
   }
   
   // Clear out the transforms
